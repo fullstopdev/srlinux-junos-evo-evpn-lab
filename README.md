@@ -3,10 +3,10 @@
 Ethernet VPN proposes a unified model for VPNs and cloud-based services, by providing a control plane framework that can deliver any type of VPN services.  This lab provides an interoperability use case between  Nokia SR Linux and Juniper JunOS EVO , in a datacenter context.  
 
 A square fabric architecture will be deployed, as represented below:
- - 3 SR Linux routers 7220 D2L and 2 SR Linux L2 switches 7220 D2L
- - 1 JunOS EVO
- - 2 CE Routers 7750 SR-1
- - 3 PE Routers 7750 SR-1
+ - 3 Nokia SR Linux  7220 D2L and 2 Nokia SR Linux L2 switches 7220 D2L
+ - 1 Juniper JunOS EVO
+ - 2 CE Routers Nokia 7750 SR-1
+ - 3 PE Routers Nokia 7750 SR-1
  - 2 hosts clients and 1 server
 ![image](https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/7903ce46-7615-470a-8d21-b144b9657e8a)
 
