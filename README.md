@@ -138,36 +138,6 @@ docker exec -it client1 bash
 Check that you can access all equipments.
 
 
-
-## SROS Streaming Telemetry
-
-This lab was enhanced with Streaming Telemetry by adding gNIMc, Prometheus and Grafana.
-
-For details please refer to [SR Linux/SROS Streaming Telemetry Lab](https://github.com/srl-labs/srl-sros-telemetry-lab).
-
-
-
-
-### Telemetry stack
-
-The following stack of software solutions has been chosen for this lab:
-
-| Role                | Software                                            | Port               | Link                               | Credentials        |
-| ------------------- | --------------------------------------------------- |------------------- | ---------------------------------- |------------------- |
-| Telemetry collector | [gnmic](https://gnmic.openconfig.net)               | 57400              |                                    |                    |
-| Time-Series DB      | [prometheus](https://prometheus.io)                 | 9090               | http://localhost:9090/graph        |                    |
-| Visualization       | [grafana](https://grafana.com)                      | 3000               | http://localhost:3000              | admin/admin        |
-
-
-
-
-
-
-### Access details
-
-If you are accessing from a remote host, then replace localhost by the CLAB Server IP address
-* Grafana: <http://localhost:3000>. Built-in user credentials: `admin/admin`
-* Prometheus: <http://localhost:9090/graph>
  
 ## Configuration
 ### Nokia SRLinux port/lag configuration
@@ -421,8 +391,323 @@ et-0/0/1 {
 
 ```
 ## Control Plan configuration
+### BGP Configuration SRLinux
+This is the global bgp configuration:
+
+```bash
+A:srl-1# /info network-instance default protocols bgp
+    network-instance default {
+        protocols {
+            bgp {
+                admin-state enable
+                autonomous-system 65001
+                router-id 169.254.0.1
+                afi-safi evpn {
+                    evpn {
+                        rapid-update true
+                    }
+                }
+                afi-safi ipv4-unicast {
+                    admin-state enable
+                    multipath {
+                        allow-multiple-as true
+                        max-paths-level-1 64
+                        max-paths-level-2 64
+                    }
+                }
+                route-advertisement {
+                    rapid-withdrawal true
+                    wait-for-fib-install true
+                }
+                group ebgp-underlay {
+                    admin-state enable
+                }
+                group ibgp-evpn {
+                    admin-state enable
+                }
+
+```
+
+Underlay
+```bash
+A:srl-1# /info network-instance default protocols bgp group ebgp-underlay
+    network-instance default {
+        protocols {
+            bgp {
+                group ebgp-underlay {
+                    admin-state enable
+                    export-policy export-to-underlay
+                    import-policy import-from-underlay
+                    failure-detection {
+                        enable-bfd true
+                        fast-failover true
+                    }
+                    afi-safi evpn {
+                        admin-state disable
+                    }
+                    afi-safi ipv4-unicast {
+                        admin-state enable
+                    }
+                    afi-safi ipv6-unicast {
+                        admin-state disable
+                    }
+                    timers {
+                        connect-retry 10
+                        hold-time 3
+                        keepalive-interval 1
+                        minimum-advertisement-interval 1
+                    }
+                }
+            }
+        }
+
+```
+Overlay
+```bash
+A:srl-1# /info network-instance default protocols bgp group ibgp-evpn
+    network-instance default {
+        protocols {
+            bgp {
+                group ibgp-evpn {
+                    admin-state enable
+                    export-policy export-all
+                    import-policy import-all
+                    peer-as 65501
+                    failure-detection {
+                        enable-bfd true
+                        fast-failover true
+                    }
+                    afi-safi evpn {
+                        admin-state enable
+                    }
+                    afi-safi ipv4-unicast {
+                        admin-state disable
+                    }
+                    afi-safi ipv6-unicast {
+                        admin-state disable
+                    }
+                    local-as {
+                        as-number 65501
+                        prepend-global-as false
+                    }
+                    timers {
+                        connect-retry 10
+                        hold-time 3
+                        keepalive-interval 1
+                        minimum-advertisement-interval 1
+                    }
+                    transport {
+                        local-address 169.254.0.1
+                    }
+                }
+            }
+        }
+    }
+
+```
 
 
+
+### BGP Configuration JunOS EVO
+
+This is the required configuration for JunOS EVO Underlay and Overlay
+
+```bash
+ admin@vswitch-1# edit protocols bgp
+
+[edit protocols bgp]
+admin@vswitch-1# show
+group iBGP-evpn {
+    type internal;
+    local-address 100.20.0.5;
+    import vrf-imp;
+    family evpn {
+        signaling;
+    }
+    local-as 65501;
+    bfd-liveness-detection {
+        minimum-interval 100000;
+        minimum-receive-interval 100000;
+        multiplier 3;
+    }
+    neighbor 100.20.0.2;
+    neighbor 100.20.0.3;
+    neighbor 100.20.0.1;
+}
+group underlay {
+    type external;
+    export lo0;
+    local-as 65005;
+    multipath {
+        multiple-as;
+    }
+    bfd-liveness-detection {
+        minimum-interval 100000;
+        minimum-receive-interval 100000;
+        multiplier 3;
+    }
+    neighbor 100.64.5.0 {
+        peer-as 65002;
+    }
+    neighbor 100.64.5.2 {
+        peer-as 65003;
+    }
+}
+```
+### Ethernet Segment 
+<p align="center">
+  <img  src="https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/1d1d91d1-813f-4349-b1a4-cffa8bcac3bd?raw=true">
+</p>
+
+
+admin-key, system-id-mac and system-priority must be the same betweenn SRLinux and Junos EVO.
+<p align="center">
+  <img  src="https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/a0d65cfe-4301-494b-af19-f3230850df50?raw=true">
+</p>
+
+### show commands
+```bash
+A:srl-2# /show system network-instance ethernet-segments
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ES-1 is up, all-active
+  ESI      : 00:11:11:11:11:11:11:02:00:01
+  Alg      : preference
+  Peers    : 100.20.0.5
+  Interface: lag1
+  Next-hop : N/A
+  evi      : N/A
+  Network-instances:
+     L2-10-MACVRF10
+      Candidates : 100.20.0.2, 100.20.0.5 (DF)
+      Interface : lag1.10
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ES-CORE is up, all-active
+  ESI      : 00:11:11:11:11:11:11:02:00:02
+  Alg      : preference
+  Peers    : 100.20.0.5
+  Interface: lag2
+  Next-hop : N/A
+  evi      : N/A
+  Network-instances:
+     L2-10-MACVRF10
+      Candidates : 100.20.0.2, 100.20.0.5 (DF)
+      Interface : lag2.10
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Summary
+ 2 Ethernet Segments Up
+ 0 Ethernet Segments Down
+```
+
+```bash
+admin@vswitch-1> show evpn instance esi-info
+Instance: __default_evpn__
+
+Instance: mac-v10
+  Number of ethernet segments: 4
+    ESI: 00:11:11:11:11:11:11:02:00:01
+      Status: Resolved by IFL ae0.10
+      Local interface: ae0.10, Status: Up/Forwarding
+      Number of remote PEs connected: 1
+        Remote-PE        MAC-label  Aliasing-label  Mode
+        100.20.0.2       10010      10010           all-active
+      DF Election Algorithm: Preference based
+      Designated forwarder: 100.20.0.5, Preference: 900
+      Last designated forwarder update: Feb 29 09:18:02
+    ESI: 00:11:11:11:11:11:11:02:00:02
+      Status: Resolved by IFL ae1.10
+      Local interface: ae1.10, Status: Up/Forwarding
+      Number of remote PEs connected: 1
+        Remote-PE        MAC-label  Aliasing-label  Mode
+        100.20.0.2       10010      10010           all-active
+      DF Election Algorithm: Preference based
+      Designated forwarder: 100.20.0.5, Preference: 900
+      Last designated forwarder update: Feb 29 09:35:12
+
+```
+## Telemetry stack
+
+As the lab name suggests, telemetry is at its core. The following telemetry stack is used in this lab:
+
+| Role                | Software                              |
+| ------------------- | ------------------------------------- |
+| Telemetry collector | [gnmic](https://gnmic.openconfig.net) |
+| Time-Series DB      | [prometheus](https://prometheus.io)   |
+| Visualization       | [grafana](https://grafana.com)        |
+
+### gnmic
+
+[gnmic](https://gnmic.openconfig.net) is an Openconfig project that allows to subscribe to streaming telemetry data from network devices and export it to a variety of destinations. In this lab, gnmic is used to subscribe to the telemetry data from the fabric nodes and export it to the prometheus time-series database.
+
+The gnmic configuration file - [gnmic-config.yml](gnmic-config.yml) - is applied to the gnmic container at the startup and instructs it to subscribe to the telemetry data and export it to the prometheus time-series database.
+
+### Prometheus
+
+[Prometheus](https://prometheus.io) is a popular open-source time-series database. It is used in this lab to store the telemetry data exported by gnmic. The prometheus configuration file - [configs/prometheus/prometheus.yml](configs/prometheus/prometheus.yml) - has a minimal configuration and instructs prometheus to scrape the data from the gnmic collector with a 5s interval.
+
+### Grafana
+
+Grafana is another key component of this lab as it provides the visualisation for the collected telemetry data. Lab's topology file includes grafana node and configuration parameters such as dashboards, datasources and required plugins.
+
+Grafana dashboard provided by this repository provides multiple views on the collected real-time data. Powered by [flowchart plugin](https://grafana.com/grafana/plugins/agenty-flowcharting-panel/) it overlays telemetry sourced data over graphics such as topology and front panel views:
+
+<p align="center">
+  <img width="900" height="400" src="https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/1fc52592-83e9-4070-b56c-0193b825ec7a?raw=true">
+</p>
+
+Using the flowchart plugin and real telemetry data users can create interactive topology maps (aka weathermap) with a visual indication of link rate/utilization.
+
+
+### Access details
+
+Using containerlab's ability to expose ports of the containers to the host, the following services are available on the host machine:
+
+* Grafana: <http://localhost:3000>. Anonymous access is enabled; no credentials are required. If you want to act as an admin, use `admin/admin` credentials.
+* Prometheus: <http://localhost:9090/graph>
+## Tests and Traffic generation
+
+There are 2 Clients and a server :
+- Client1: 192.168.0.11
+- Client2: 192.168.0.21
+- Server: 192.168.2.11
+
+
+## Traffic generation
+
+When the lab is started, there is not traffic running between the nodes as the clients are sending any data. To run traffic between the nodes, leverage `traffic.sh` control script.
+
+To start the traffic:
+
+* `bash traffic.sh start all` - start traffic between all nodes
+* `bash traffic.sh start 1-s` - start traffic between client1 and server
+* `bash traffic.sh start 2-s` - start traffic between client2 and server
+* `bash traffic.sh start 1-1` - start traffic between client1 and client2
+
+To stop the traffic:
+
+* `bash traffic.sh stop all` - stop traffic generation between all nodes
+* `bash traffic.sh stop 1-s` - stop traffic generation between client1 and server
+* `bash traffic.sh stop 2-s` - stop traffic generation between client2 and server
+* `bash traffic.sh stop 1-2` - stop traffic generation between client1 and client2
+
+As a result, the traffic will be generated between the clients  and server and the traffic rate will be reflected on the grafana dashboard.
+
+![image](https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/e5aa0ee1-13c3-4c46-8d8a-cce2011f333d)
+
+
+We shutdown the port between srl-2 and sw2 so all the traffic  from/to Client2 goes through the JunOS EVO
+
+```bash
+A:srl-2# interface ethernet-1/55 admin-state disable
+
+--{ * candidate shared default }--[  ]--
+A:srl-2# commit stay
+All changes have been committed. Starting new transaction.
+
+--{ + candidate shared default }--[  ]--
+A:srl-2#
+
+```
+![image](https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/09a2df03-2299-4a52-898a-22089ef81e9c)
 
 
 
