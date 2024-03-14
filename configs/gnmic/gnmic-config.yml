@@ -1,0 +1,207 @@
+username: admin
+password: NokiaSrl1!
+port: 57400
+timeout: 10s
+encoding: json_ietf
+
+
+common_srl_subscriptions: &common_srl_subs
+  skip-verify: true
+  subscriptions:
+    - srl_macs
+    - srl_power_state
+    - srl_power_temperature
+    - srl_chassis
+    - srl_fan_state
+    - srl_if_oper_state
+    - srl_net_instance
+    - srl_if_stats
+    - srl_if_traffic_rate
+    - srl_cpu
+    - srl_mem
+    - srl_bgp_stats
+    - srl_ipv4_routes
+    - srl_ipv6_routes
+    - srl_apps
+
+common_sros_subscriptions: &common_sros_subs
+  insecure: true
+  password: admin
+  subscriptions:
+    - sros_if_oper_state
+    - sros_if_traffic_rate
+
+targets:
+  srl-1: *common_srl_subs
+  srl-2: *common_srl_subs
+  srl-3: *common_srl_subs
+  L2-SW-1: *common_srl_subs
+  L2-SW-2: *common_srl_subs
+  7750-DCIGW-1: *common_sros_subs
+  7750-DCIGW-2: *common_sros_subs
+  7750-DCIGW-3: *common_sros_subs
+  7750-CORE-1: *common_sros_subs
+  7750-CORE-2: *common_sros_subs
+
+subscriptions:
+
+  ### SROS ###
+  sros_if_oper_state:
+    paths:
+      - /state/port[port-id=*]/oper-state
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  sros_if_traffic_rate:
+    paths:
+      - /state/port[port-id=*]/ethernet/statistics
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  ### SR Linux ###
+
+
+  srl_power_state:
+    paths:
+      - /platform/power-supply[id=*]
+    mode: stream
+    stream-mode: sample
+    sample-interbal: 5s
+
+  srl_power_temperature:
+    paths:
+      - /platform/power-supply[id=*]/temperature
+    mode: stream
+    stream-mode: sample
+    sample-interbal: 5s
+
+  srl_chassis:
+    paths:
+      - /platform/chassis/power/total
+    mode: stream
+    stream-mode: sample
+    sample-interbal: 5s
+
+  srl_fan_state:
+    paths:
+      - /platform/fan-tray[id=*]
+    mode: stream
+    stream-mode: sample
+    sample-interbal: 5s
+
+  srl_if_oper_state:
+    paths:
+      - /interface[name=ethernet-1/*]/oper-state
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_net_instance:
+    paths:
+      - /network-instance[name=*]/oper-state
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_if_stats:
+    paths:
+      - /interface[name=ethernet-1/*]/statistics
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_if_traffic_rate:
+    paths:
+      - /interface[name=ethernet-1/*]/traffic-rate
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_cpu:
+    paths:
+      - /platform/control[slot=*]/cpu[index=all]/total
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_mem:
+    paths:
+      - /platform/control[slot=*]/memory
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_bgp_stats:
+    paths:
+      - /network-instance[name=*]/protocols/bgp/statistics
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_ipv4_routes:
+    paths:
+      - /network-instance[name=*]/route-table/ipv4-unicast/statistics/
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_ipv6_routes:
+    paths:
+      - /network-instance[name=*]/route-table/ipv6-unicast/statistics/
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+  srl_apps:
+    paths:
+      - /system/app-management/application[name=*]
+    mode: stream
+    stream-mode: sample
+    sample-interval: 5s
+
+outputs:
+  prom:
+    type: prometheus
+    listen: :9273
+    path: /metrics
+    metric-prefix: gnmic
+    append-subscription-name: true
+    export-timestamps: true
+    debug: false
+    event-processors:
+      - trim-prefixes
+      - up-down-map
+  # stdout:
+  #   type: file
+  #   file-type: stdout
+  #   event-processors:
+  #     - proc-convert-strings-to-int
+  #     - trim-prefixes
+
+processors:
+  trim-prefixes:
+    event-strings:
+      value-names:
+        - ".*"
+      transforms:
+        - path-base:
+            apply-on: "name"
+  up-down-map:
+    event-strings:
+      value-names:
+        - oper-state
+      transforms:
+        - replace:
+            apply-on: "value"
+            old: "up"
+            new: "1"
+        - replace:
+            apply-on: "value"
+            old: "down"
+            new: "0"
+        - replace:
+            apply-on: "value"
+            old: "empty"
+            new: "3"
