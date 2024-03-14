@@ -8,6 +8,9 @@ A square fabric architecture will be deployed, as represented below:
  - 2 CE Routers 7750 SR-1
  - 3 PE Routers 7750 SR-1
  - 2 hosts clients and 1 server
+![image](https://github.com/fullstopdev/srlinux-junos-evo-evpn-lab/assets/161751862/7903ce46-7615-470a-8d21-b144b9657e8a)
+
+
 
 
 <p align="center">
