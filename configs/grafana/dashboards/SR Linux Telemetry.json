@@ -47,7 +47,7 @@
       },
       "editedFlag": false,
       "flowchartsData": {
-        "allowDrawio": false,
+        "allowDrawio": true,
         "editorTheme": "dark",
         "editorUrl": "https://www.draw.io",
         "flowcharts": [
