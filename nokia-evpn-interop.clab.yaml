@@ -130,7 +130,7 @@ topology:
     7750-RENATER-1:
       kind: vr-sros
       mgmt-ipv4: 172.50.60.33
-      startup-config: configs/pe/REN1.partial.cfg
+      startup-config: configs/pe/gw1.partial.cfg
       ports:
         - 58211:22/tcp
         - 57411:50052
@@ -140,7 +140,7 @@ topology:
     7750-RENATER-2:
       kind: vr-sros
       mgmt-ipv4: 172.50.60.34
-      startup-config: configs/pe/REN2.partial.cfg
+      startup-config: configs/pe/gw2.partial.cfg
       ports:
         - 58212:22/tcp
         - 57412:50052
@@ -150,7 +150,7 @@ topology:
     7750-RENATER-3:
       kind: vr-sros
       mgmt-ipv4: 172.50.60.35
-      startup-config: configs/pe/REN3.partial.cfg
+      startup-config: configs/pe/gw3.partial.cfg
       ports:
         - 58213:22/tcp
         - 57413:50052
